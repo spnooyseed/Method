@@ -100,7 +100,8 @@ def kl_loss(embeds, mu, logvar, eps, k, j):
 	log_posterior_ker = torch.logsumexp(log_post_ker, dim=-1).mean()
 	return log_prior_ker, log_posterior_ker
 
-
+def lalign(x, y, alpha=2): 
+	return (x - y).norm(dim=1).pow(alpha).mean()
 
 
 

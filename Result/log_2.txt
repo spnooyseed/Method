@@ -1,0 +1,31 @@
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.01 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.01_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.1 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.1_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.2 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.2_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.3 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.3_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.4 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.4_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+Executed:  python3 Main.py --data yelp --ssl_reg_ui 0.5 --lambda_1 0.8 --time_step 80 --elbo 0.2 --gcn_layer0 2 --reg 0.001 --alpha 0 --epoch 10 > Result/yelp/_ssl_reg_ui_0.5_lambda_1_0.8_time_step_80_elbo_0.2_gcn_layer0_2_reg_0.001_alpha_0_epoch_10.txt
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:53: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt = np.reshape(np.power(degree, -0.5), [-1])
+/home/sunkaikai/workspace/GDiffMAE-main/DataHandler.py:54: RuntimeWarning: divide by zero encountered in power
+  dInvSqrt1 = np.reshape(np.power(degree, -1), [-1])
+All tasks completed.

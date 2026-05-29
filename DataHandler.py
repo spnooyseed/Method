@@ -129,6 +129,26 @@ class DataHandler:
         return mat_masked.tocoo()
 
 
+    def maskedge_deg_1(self, mat, Lp=args.lp, Hp=args.mask_r) -> Tuple[sp.coo_matrix, torch.Tensor]:
+        # return mat
+        user_deg = mat.sum(axis=1).flatten()
+        item_deg = mat.sum(axis=0).flatten()
+        deg = np.array(np.concatenate((user_deg, item_deg), axis=1)).flatten()
+        mask_p = np.zeros_like(mat.row , dtype=np.float32)
+        mask_p = np.clip(2 / np.sqrt(deg[mat.row] * deg[mat.col + mat.shape[0]] + 1) , 0., 1.)
+        # min_wd = np.min(mask_p)
+        # mu_wd = np.mean(mask_p)
+        # p_drop = 0.2
+        # normalized_prob = (mask_p - min_wd) / (mu_wd - min_wd) * p_drop
+        # p_tau_prime = 0.8
+        # mask_p = np.minimum(normalized_prob, p_tau_prime)
+
+        mask_p = np.array(torch.bernoulli(torch.tensor(mask_p)), dtype=bool)
+        mat_masked = mat.tocsr().copy()
+        mat_masked[mat.row[mask_p], mat.col[mask_p]] = 0
+        mat_masked = (mat_masked != 0) * 1.0
+        return mat_masked.tocoo()
+
     def maskedge_deg_mean(self, mat, Lp=args.lp, Hp=args.mask_r) -> Tuple[sp.coo_matrix, torch.Tensor]:
         user_deg = mat.sum(axis=1).flatten()
         item_deg = mat.sum(axis=0).flatten()
@@ -150,17 +170,48 @@ class DataHandler:
         mat_masked = (mat_masked != 0) * 1.0
         return mat_masked.tocoo()
 
+    def convert_sparse_mat_to_tensor(self, X):
+        coo = X.tocoo()
+        i = torch.LongTensor([coo.row, coo.col])
+        v = torch.from_numpy(coo.data).float()
+        return torch.sparse_coo_tensor(i, v, coo.shape)
+
+    def makeTorchSvdAdj(self , mat):
+        # U , (U , I) , I
+        colsum = np.array(mat.sum(0)) # (,I)
+        rowsum = np.array(mat.sum(1)) # (U,)
+        d_inv = np.power(rowsum, -0.5).flatten()
+        d_inv[np.isinf(d_inv)] = 0.
+        d_mat_inv = sp.diags(d_inv)
+        norm_adj_mat = d_mat_inv.dot(mat)
+        d_inv = np.power(colsum, -0.5).flatten()
+        d_inv[np.isinf(d_inv)] = 0.
+        d_mat_inv = sp.diags(d_inv)
+        norm_adj_mat = norm_adj_mat.dot(d_mat_inv)
+        sparse_norm_adj = self.convert_sparse_mat_to_tensor(norm_adj_mat).cuda()
+
+        svd_u, s, svd_v = torch.svd_lowrank(sparse_norm_adj, q=1)
+        svd_adj_1 = svd_u @ torch.diag(s) @ svd_v.T
+
+        # svd_u, s, svd_v = torch.svd_lowrank(sparse_norm_adj, q=5)
+        # svd_adj_2 = svd_u @ torch.diag(s) @ svd_v.T
+        return svd_adj_1
 
     def LoadData(self):
         self.trnMat = self.loadOneFile(self.trnfile)
         self.tstMat = self.loadOneFile(self.tstfile)
         args.user, args.item = self.trnMat.shape
         self.torchBiAdj, self.torchD_1Aadj = self.makeTorchAdj(self.trnMat)
+        # self.torchSvdAdj_1 = self.makeTorchSvdAdj(self.trnMat)
         self.allOneAdj = self.makeAllOne(self.torchBiAdj)
         trnData = TrnData(self.trnMat)
         self.trnLoader = dataloader.DataLoader(trnData, batch_size=args.batch, shuffle=True, num_workers=4)
         tstData = TstData(self.tstMat, self.trnMat)
         self.tstLoader = dataloader.DataLoader(tstData, batch_size=args.tstBat, shuffle=False, num_workers=4)
+        maskmat = self.maskedge_deg(self.trnMat)
+        self.masktorchBiAdj, _ = self.makeTorchAdj(maskmat)
+        maskmat = self.maskedge_deg_1(self.trnMat)
+        self.masktorchBiAdj_1, _ = self.makeTorchAdj(maskmat)
         # valData = TstData(self.valMat, self.trnMat)
         # self.valLoader = dataloader.DataLoader(valData, batch_size=args.tstBat, shuffle=False, num_workers=4)
 

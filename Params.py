@@ -3,6 +3,8 @@ import argparse
 
 def ParseArgs():
     parser = argparse.ArgumentParser(description='Model Params')
+    # ml-1m
+    # douban
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--lr1', default=1e-4, type=float, help='learning rate for denoise model')
     parser.add_argument('--batch', default=2048, type=int, help='batch size')
@@ -12,13 +14,14 @@ def ParseArgs():
     parser.add_argument('--ssl_reg_ui', default=0.3, type=float, help='uni_ui regularizer')
     parser.add_argument('--temperature', default=5, type=float, help='uni_temperature')
     parser.add_argument('--temperature1', default=0.5, type=float, help='u-i_uni_temperature')
+    parser.add_argument('--temperature2', default=0.2, type=float, help='cl_temperature')
     parser.add_argument('--epoch', default=100, type=int, help='number of epochs')
     parser.add_argument('--decay', default=0, type=float, help='weight decay rate')
     parser.add_argument('--latdim', default=300, type=int, help='embedding size')
     parser.add_argument('--mask_r', default=1, type=float, help='mask ratio')
     parser.add_argument('--lp', default=0, type=float, help='mask ratio low bound')
     parser.add_argument('--gcn_layer0', default=2, type=int, help='number of gcn layers')
-
+    parser.add_argument('--cl_loss', default=0.2, type=float, help='weight contrastive learning')
 
 
     # diffusion model
@@ -51,7 +54,31 @@ def ParseArgs():
     parser.add_argument('--tstEpoch', default=1, type=int, help='number of epoch to test while training')
     parser.add_argument('--gpu', default='0', type=str, help='indicates which gpu to use')
     parser.add_argument('--seed', default='3407', type=int, help='model seed')
+    parser.add_argument('--alpha', default='0', type=float, help='inference stage use alpha control weight of diffusion model')
+    parser.add_argument('--lambda_1', default='0.9', type=float)
 
+    # AdaGCL parames
+    # parser.add_argument('--ssl_reg', default=0.1, type=float, help='weight for contrative learning')
+    # parser.add_argument("--ib_reg", type=float, default=0.1, help='weight for information bottleneck')
+    # parser.add_argument('--temp', default=0.5, type=float, help='temperature in contrastive learning')
+    # parser.add_argument('--lambda0', type=float, default=1e-4, help='weight for L0 loss on laplacian matrix.')
+    # parser.add_argument('--gamma', type=float, default=-0.45)
+    # parser.add_argument('--zeta', type=float, default=1.05)
+    # parser.add_argument('--init_temperature', type=float, default=2.0)
+    # parser.add_argument('--temperature_decay', type=float, default=0.98)
+    # parser.add_argument("--eps", type=float, default=1e-3)
+
+    # DiffRec
+    parser.add_argument('--weight_decay', type=float, default=0.0)
+    parser.add_argument('--round', type=int, default=1, help='record the experiment')
+
+    # params for the model
+    parser.add_argument('--time_type', type=str, default='cat', help='cat or add')
+
+    # params for diffusion
+    parser.add_argument('--mean_type', type=str, default='x0', help='MeanType for diffusion: x0, eps')
+    parser.add_argument('--noise_schedule', type=str, default='linear-var', help='the schedule for noise generating')
+    parser.add_argument('--reweight', type=bool, default=True, help='assign different weight to different timestep or not')
     return parser.parse_args()
 
 

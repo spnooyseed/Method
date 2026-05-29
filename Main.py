@@ -47,7 +47,7 @@ class Coach:
             if save and tem in self.metrics:
                 self.metrics[tem].append(val)
         ret = ret[:-2] + '  '
-        return ret
+        return f'{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")} ' + ret
     
     def makePrintRes(self, name, ep, reses):
         ret = 'Epoch %d/%d, %s: ' % (ep, args.epoch, name)
@@ -55,7 +55,7 @@ class Coach:
             val = reses[metric]
             ret += '%s = %.4f, ' % (metric, val)
         ret = ret[:-2] + '  '
-        return ret
+        return f'{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")} ' + ret
 
     def run(self):
         self.prepareModel()
@@ -67,9 +67,18 @@ class Coach:
             stloc = 0
             log('Model Initialized')  
         curTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        fileName = f'trainingResult{args.data}-{curTime}'
+        fileName = f'GD_{args.data}-{curTime}_pid_{os.getppid()}'
         with open('./Result/' + fileName + '.txt', 'w') as f:
             hypeParameters = vars(args) 
+            with open(__file__, 'r', encoding='utf-8') as ff:
+                content = ff.read()
+                f.write(content)
+            with open('./Model.py', 'r', encoding='utf-8') as ff:
+                content = ff.read()
+                f.write(content)
+            with open('./DataHandler.py', 'r', encoding='utf-8') as ff:
+                content = ff.read()
+                f.write(content)
             f.write("HyperParameters:\n")
             for k, v in hypeParameters.items():
                 f.write(f"{k}: {v}\n")
@@ -100,7 +109,7 @@ class Coach:
             f.write(f"{self.makePrintRes('Best Result', args.epoch, bestRes)}")
 
     def prepareModel(self):
-        self.model = Model().to(device)
+        self.model = Model(args.lambda_1).to(device)
         self.opt = torch.optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.decay)
         self.diffusion_model = Diffusion(args.noise_scale, args.noise_min, args.noise_max, args.time_step).to(device)
         mlp_out_dims = eval(args.mlp_dims) + [args.latdim]
@@ -110,8 +119,6 @@ class Coach:
 
     def trainEpoch(self, ep):
         epLoss, epPreLoss, epreg_loss, epunformity_loss, epelbo_loss = 0, 0, 0, 0, 0
-        maskmat = self.handler.maskedge_deg(self.handler.trnMat)
-        self.handler.masktorchBiAdj, _ = self.handler.makeTorchAdj(maskmat)
         trnLoader = self.handler.trnLoader
         trnLoader.dataset.negSampling()
         steps = trnLoader.dataset.__len__() // args.batch
@@ -129,14 +136,14 @@ class Coach:
             batch_idx += args.user
             batch_idx = torch.cat([ancs, batch_idx], dim=0)
             batch_idx = torch.unique(batch_idx)
-            usrEmbeds, itmEmbeds, condition_embeds, uemb, iemb = self.model(self.handler.masktorchBiAdj , self.handler.torchD_1Aadj)
+            usrEmbeds, itmEmbeds, condition_embeds  , uemb, iemb = self.model(self.handler.masktorchBiAdj_1 , self.handler.torchD_1Aadj)
             ancEmbeds = usrEmbeds[ancs] 
-            ancs_unique = torch.unique(ancs)
             posEmbeds = itmEmbeds[poss] 
-            pos_unique = torch.unique(poss)
             negEmbeds = itmEmbeds[neg]
+            ancs_unique = torch.unique(ancs)
+            pos_unique = torch.unique(poss)
             embeds = torch.cat([usrEmbeds, itmEmbeds], dim=0) 
-            diff_loss, _, _ = self.diffusion_model.training_loss(self.denoise_model, embeds, condition_embeds, args.noiseDirection, batch_idx)
+            diff_loss, _, _ = self.diffusion_model.training_loss(self.denoise_model, embeds, condition_embeds  , args.noiseDirection, batch_idx)
             elbo = diff_loss.mean() * args.elbo
             uniformity_loss = (Uniformity_loss2(usrEmbeds[ancs_unique], usrEmbeds[ancs_unique], args.temperature) + Uniformity_loss2(itmEmbeds[pos_unique], itmEmbeds[pos_unique], args.temperature)) * args.ssl_reg_uu_ii + Uniformity_loss2(usrEmbeds[ancs_unique], itmEmbeds[pos_unique], args.temperature1) * args.ssl_reg_ui
             BPRloss = torch.mean(-torch.log(10e-6+torch.sigmoid(pairPredict(ancEmbeds, posEmbeds, negEmbeds))))
@@ -170,11 +177,12 @@ class Coach:
         self.model.eval()
         self.diffusion_model.eval()
         self.denoise_model.eval()
-        usrEmbeds, itmEmbeds, condition_embeds, _, _ = self.model(self.handler.torchBiAdj, self.handler.torchD_1Aadj)
+        usrEmbeds, itmEmbeds, condition_embeds, _, _  = self.model(self.handler.torchBiAdj, self.handler.torchD_1Aadj)
         embeds = torch.cat([usrEmbeds, itmEmbeds], dim=0)
-        embeds_recon = self.diffusion_model.p_sample(self.denoise_model, embeds, condition_embeds, args.sample_step, args.noiseDirection)
-        usrEmbeds = embeds_recon[:args.user]
-        itmEmbeds = embeds_recon[args.user:]
+        if args.alpha != 0 :
+            embeds_recon = self.diffusion_model.p_sample(self.denoise_model, embeds, condition_embeds, args.sample_step, args.noiseDirection)
+            usrEmbeds = args.alpha * embeds_recon[:args.user] + (1 - args.alpha) * usrEmbeds
+            itmEmbeds = args.alpha * embeds_recon[args.user:] + (1 - args.alpha) * itmEmbeds
 
         for usr, trnMask in tstLoader:
             i += 1

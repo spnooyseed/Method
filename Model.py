@@ -16,7 +16,49 @@ uniformInit = nn.init.uniform_
 zeroinit = nn.init.zeros_
 
 
-class Model(nn.Module):
+class SimGCL(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.uEmbeds = nn.Parameter(init(torch.empty(args.user, args.latdim)))
+        self.iEmbeds = nn.Parameter(init(torch.empty(args.item, args.latdim)))
+        self.gcnLayers0 = nn.Sequential(*[GCNLayer() for i in range(args.gcn_layer0)])
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for name, pama in self.named_parameters():
+            if 'weight' in name:
+                init(pama)
+            elif 'bias' in name:
+                zeroinit(pama)
+
+    def getEgoEmbeds(self):
+        return torch.cat([self.uEmbeds, self.iEmbeds], dim=0)
+    
+    def reparameter(self, mean, logvar):
+        std = torch.exp(logvar / 2.)
+        eps = torch.randn_like(std) * 0.1
+        return mean + eps * std, eps
+
+
+    def forward(self, adj, perturbed=False):
+        embeds_list = []
+        embeds = self.getEgoEmbeds()
+        for i, gcn in enumerate(self.gcnLayers0):
+            embeds = gcn(adj, embeds)
+            if perturbed:
+                random_noise = torch.rand_like(embeds).cuda()
+                embeds += torch.sign(embeds) * F.normalize(random_noise, dim=-1) * 0.2
+            embeds_list.append(embeds)
+        embeds = torch.stack(embeds_list, dim=0)
+        embeds = torch.mean(embeds, dim=0)
+
+        return embeds[:args.user], embeds[args.user:]
+
+    def getGCN(self):
+        return self.gcnLayers
+
+
+class LightGCN(nn.Module):
     def __init__(self):
         super().__init__()
         self.uEmbeds = nn.Parameter(init(torch.empty(args.user, args.latdim)))
@@ -49,9 +91,51 @@ class Model(nn.Module):
             embeds_list.append(embeds)
         embeds = torch.stack(embeds_list, dim=0)
         embeds = torch.mean(embeds, dim=0)
-        condition_embeds = gcn(D_1adj, embeds)
 
-        return embeds[:args.user], embeds[args.user:], condition_embeds, self.uEmbeds, self.iEmbeds
+        return embeds[:args.user], embeds[args.user:]
+
+    def getGCN(self):
+        return self.gcnLayers
+
+
+class Model(nn.Module):
+    def __init__(self, lambda_1=0.9):
+        super().__init__()
+        self.uEmbeds = nn.Parameter(init(torch.empty(args.user, args.latdim)))
+        self.iEmbeds = nn.Parameter(init(torch.empty(args.item, args.latdim)))
+        self.gcnLayers0 = nn.Sequential(*[GCNLayer() for i in range(args.gcn_layer0)])
+        self.lambda_1 = lambda_1
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for name, pama in self.named_parameters():
+            if 'weight' in name:
+                init(pama)
+            elif 'bias' in name:
+                zeroinit(pama)
+
+    def getEgoEmbeds(self):
+        return torch.cat([self.uEmbeds, self.iEmbeds], dim=0)
+    
+    def reparameter(self, mean, logvar):
+        std = torch.exp(logvar / 2.)
+        eps = torch.randn_like(std) * 0.1
+        return mean + eps * std, eps
+
+
+    def forward(self, adj, D_1adj):
+        embeds_list = []
+        embeds = self.getEgoEmbeds()
+        embeds_list.append(embeds)
+        for i, gcn in enumerate(self.gcnLayers0):
+            embeds = gcn(adj, embeds)
+            embeds_list.append(embeds)
+        embeds = torch.stack(embeds_list, dim=0)
+        embeds = torch.mean(embeds, dim=0)
+        condition_embeds = gcn(D_1adj, embeds)
+        condition_embeds_1 = gcn(D_1adj, condition_embeds)
+        condition_embeds = condition_embeds * self.lambda_1 + (1 - self.lambda_1) * condition_embeds_1
+        return embeds[:args.user], embeds[args.user:], condition_embeds , self.uEmbeds, self.iEmbeds
         
 
 
@@ -66,6 +150,9 @@ class GCNLayer(nn.Module):
 
     def forward(self, adj, embeds: torch.Tensor):
         if len(embeds.shape) == 2:
+            if adj.shape[1] != embeds.shape[0] :
+                user , item = torch.split(embeds , [*adj.shape])
+                return torch.cat([adj @ item , adj.T @ user] , dim=0)
             return torch.sparse.mm(adj, embeds)
         
         if len(embeds.shape) == 3:
@@ -78,7 +165,6 @@ class GCNLayer(nn.Module):
                 else:
                     out = torch.cat((out, h.unsqueeze(0)), dim=0)
             return out
-                    
 
 class Diffusion(nn.Module):
     def __init__(self, noise_scale, noise_min, noise_max, time_step, Beta=False, beta=0.001,  history_num_per_term=10, ):
@@ -150,7 +236,7 @@ class Diffusion(nn.Module):
         assert x_start.shape == xt.shape
 
         posterior_mean = (
-            self._extract_into_tensor(self.posterior_mean_coef1, t, x_start.shape) * x_start + self._extract_into_tensor(self.posterior_mean_coef2, t, xt.shape) + xt
+            self._extract_into_tensor(self.posterior_mean_coef1, t, x_start.shape) * x_start + self._extract_into_tensor(self.posterior_mean_coef2, t, xt.shape) * xt
         )
         posterior_var = self._extract_into_tensor(self.posterior_var, t, x_start.shape)
         posterior_log_var_clip = self._extract_into_tensor(self.posterior_log_var_clipped, t, x_start.shape)
@@ -220,7 +306,7 @@ class Diffusion(nn.Module):
     
 
 
-    def training_loss(self, model, x_start, condition_embeds, noise_d, batch):
+    def training_loss(self, model, x_start, condition_embeds , noise_d, batch):
         batch_size = x_start.shape[0]
         ts = torch.randint(0, self.time_step, (batch_size,), device=device).long()
         if noise_d is False:
@@ -234,8 +320,8 @@ class Diffusion(nn.Module):
         
         if self.noise_scale != 0:
             x_t = self.q_sample(x_start, ts, noise)
-            model_out = model(x_t[batch], ts[batch], None, False)
-            model_condition_out = model(x_t[batch], ts[batch], condition_embeds[batch], True)
+            model_out = model(x_t[batch], ts[batch], None , False)
+            model_condition_out = model(x_t[batch], ts[batch], condition_embeds[batch] , True)
         else:
             x_t = x_start
         mse = self.mean_flat((x_start[batch].detach() - model_out) ** 2)
@@ -280,7 +366,7 @@ class Diffusion(nn.Module):
         return self.alpha_bar_cumprod[t] / (1 - self.alpha_bar_cumprod[t])
 
 
-    
+
 
 class Denoise_NN(nn.Module):
 
@@ -393,7 +479,7 @@ class Denoise_NN(nn.Module):
         return emb
 
 
-    def forward(self, x, time, condition_embeds, condition=False):
+    def forward(self, x, time, condition_embeds , condition=False):
         t_emb = self.time_embedding(time, self.time_emb_dim).to(x.device)
         t_emb = self.emb_layer(t_emb)
         _x = x
@@ -405,16 +491,14 @@ class Denoise_NN(nn.Module):
             x = torch.cat([x, condition_embeds], dim=-1)
             x = torch.cat([x, t_emb], dim=-1)
             x = self.condi_in_layer(x)
-            x = self.dropout1(x)
             x = self.condi_out_layer(x)
         else:
             x = torch.cat([x, t_emb], dim=-1)
             x = self.in_layer(x)
-            x = self.dropout1(x)
             x = self.out_layer(x)
         if args.residual:
             return x + _x
         return x
-       
+    
 
         
